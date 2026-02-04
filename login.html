@@ -1,0 +1,73 @@
+<!doctype html>
+<html>
+  <head>
+    <title>RRB CBT Login</title>
+    <style>
+      body {
+        background: #0f172a;
+        color: white;
+        font-family: Arial;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+      }
+      .box {
+        background: #1e293b;
+        padding: 30px;
+        border-radius: 10px;
+        width: 300px;
+        text-align: center;
+      }
+      input,
+      button {
+        width: 100%;
+        padding: 10px;
+        margin-top: 15px;
+      }
+      button {
+        background: #22c55e;
+        border: none;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      button:hover {
+        background: #16a34a;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="box">
+      <h2>RRB GROUP D CBT</h2>
+      <input id="roll" placeholder="Enter Roll Number" />
+      <button onclick="login()">Start Exam</button>
+    </div>
+
+    <script>
+      async function login() {
+        const roll = document.getElementById("roll").value.trim();
+        if (!roll) return alert("Enter Roll Number");
+
+        // Fetch list of valid students
+        const students = await fetch("students.json").then((r) => r.json());
+        const valid = students.find((s) => s.roll === roll);
+        if (!valid) return alert("Invalid Roll Number");
+
+        // Check last attempt date
+        const lastAttempt = localStorage.getItem("attempt_" + roll);
+        const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+
+        if (lastAttempt === today) {
+          return alert(
+            "You have already attempted today’s exam. Come back tomorrow!",
+          );
+        }
+
+        // Allow exam
+        localStorage.setItem("roll", roll);
+        localStorage.setItem("attempt_" + roll, today);
+        location.href = "exam.html";
+      }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,249 @@
+<!doctype html>
+<html>
+  <head>
+    <title>RRB Group D CBT</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: "Segoe UI", Arial, sans-serif;
+        background: #0f172a;
+        color: #f1f5f9;
+      }
+
+      header {
+        background: #1e293b;
+        padding: 15px;
+        text-align: center;
+        font-size: 24px;
+        font-weight: bold;
+        letter-spacing: 1px;
+      }
+
+      #timer {
+        position: fixed;
+        top: 10px;
+        right: 20px;
+        background: #dc2626;
+        padding: 10px 15px;
+        border-radius: 8px;
+        font-weight: bold;
+        font-size: 18px;
+      }
+
+      .main {
+        display: flex;
+        height: calc(100vh - 60px);
+      }
+
+      .left {
+        width: 220px;
+        background: #020617;
+        padding: 15px;
+        overflow-y: auto;
+        border-right: 2px solid #334155;
+      }
+
+      .qno {
+        width: 40px;
+        height: 40px;
+        line-height: 40px;
+        margin: 5px;
+        display: inline-block;
+        text-align: center;
+        background: #334155;
+        border-radius: 50%;
+        cursor: pointer;
+        font-weight: bold;
+        transition: all 0.3s;
+      }
+
+      .qno.active {
+        background: #22c55e;
+        color: #000;
+      }
+
+      .qno.answered {
+        background: #facc15; /* yellow for answered */
+        color: #000;
+      }
+
+      .right {
+        flex: 1;
+        padding: 25px;
+        overflow-y: auto;
+      }
+
+      .option {
+        background: #334155;
+        padding: 12px;
+        border-radius: 8px;
+        margin: 10px 0;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+
+      .option:hover {
+        background: #475569;
+      }
+
+      input[type="radio"] {
+        margin-right: 10px;
+      }
+
+      .buttons {
+        margin-top: 20px;
+        display: flex;
+        justify-content: space-between;
+      }
+
+      button {
+        padding: 10px 25px;
+        background: #22c55e;
+        border: none;
+        border-radius: 6px;
+        font-size: 16px;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+
+      button:hover {
+        background: #16a34a;
+      }
+
+      @media (max-width: 768px) {
+        .main {
+          flex-direction: column;
+        }
+        .left {
+          width: 100%;
+          display: flex;
+          flex-wrap: wrap;
+          border-right: none;
+          border-bottom: 2px solid #334155;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>RRB GROUP D CBT</header>
+    <div id="timer">90:00</div>
+
+    <div class="main">
+      <div class="left" id="palette"></div>
+      <div class="right">
+        <div id="questionBox"></div>
+        <div class="buttons">
+          <button onclick="prevQ()">Previous</button>
+          <button onclick="nextQ()">Next</button>
+          <button onclick="submitExam()">Submit Test</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const roll = localStorage.getItem("roll");
+      if (!roll) location.href = "login.html";
+
+      let time = 90 * 60,
+        questions = [],
+        answers = {},
+        current = 0;
+
+      /* TIMER */
+      setInterval(() => {
+        time--;
+        let m = Math.floor(time / 60),
+          s = time % 60;
+        document.getElementById("timer").innerText =
+          `${m}:${s.toString().padStart(2, "0")}`;
+        if (time <= 0) submitExam();
+      }, 1000);
+
+      /* LOAD QUESTIONS */
+      fetch("questions.json")
+        .then((r) => r.json())
+        .then((d) => {
+          const pick = (a, n) => a.sort(() => 0.5 - Math.random()).slice(0, n);
+          questions = [
+            ...pick(d.maths, 25),
+            ...pick(d.reasoning, 30),
+            ...pick(d.science, 25),
+            ...pick(d.ga, 20),
+          ];
+          buildPalette();
+          showQ(0);
+        });
+
+      /* PALETTE */
+      function buildPalette() {
+        const palette = document.getElementById("palette");
+        palette.innerHTML = "";
+        questions.forEach((_, i) => {
+          const div = document.createElement("div");
+          div.className = "qno";
+          div.id = "q" + i;
+          div.innerText = i + 1;
+          div.onclick = () => showQ(i);
+          palette.appendChild(div);
+        });
+      }
+
+      /* SHOW QUESTION */
+      function showQ(i) {
+        current = i;
+        document
+          .querySelectorAll(".qno")
+          .forEach((x) => x.classList.remove("active"));
+        const qDiv = document.getElementById("q" + i);
+        qDiv.classList.add("active");
+
+        const q = questions[i];
+        const box = document.getElementById("questionBox");
+        box.innerHTML =
+          `<h3>Q${i + 1}. ${q.question}</h3>` +
+          q.options
+            .map(
+              (op, idx) => `
+          <div class="option" onclick="selectAnswer(${i}, ${idx})">
+            <label>
+              <input type="radio" name="opt" ${answers[i] == idx ? "checked" : ""}>
+              ${op}
+            </label>
+          </div>`,
+            )
+            .join("");
+      }
+
+      /* ANSWER SELECT */
+      function selectAnswer(qIndex, optIndex) {
+        answers[qIndex] = optIndex;
+        // mark palette as answered
+        const qDiv = document.getElementById("q" + qIndex);
+        qDiv.classList.add("answered");
+      }
+
+      /* NEXT/PREVIOUS */
+      function nextQ() {
+        if (current < questions.length - 1) showQ(current + 1);
+      }
+      function prevQ() {
+        if (current > 0) showQ(current - 1);
+      }
+
+      /* SUBMIT */
+      function submitExam() {
+        let c = 0,
+          w = 0;
+        questions.forEach((q, i) => {
+          if (answers[i] == undefined) return;
+          answers[i] == q.answer ? c++ : w++;
+        });
+        let score = c - w * 0.33;
+
+        localStorage.setItem("attempt_" + roll, "yes");
+        localStorage.setItem("result_" + roll, JSON.stringify({ c, w, score }));
+        location.href = "result.html";
+      }
+    </script>
+  </body>
+</html>

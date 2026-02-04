@@ -1,0 +1,9 @@
+<h2>Admin – Results</h2>
+<script>
+  for (let k in localStorage) {
+    if (k.startsWith("result_")) {
+      document.body.innerHTML += `<p>${k.replace("result_", "")} :
+    ${localStorage.getItem(k)}</p>`;
+    }
+  }
+</script>
