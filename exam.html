@@ -2,6 +2,10 @@
 <html>
   <head>
     <title>RRB Group D CBT</title>
+
+    <!-- jsPDF CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
     <style>
       body {
         margin: 0;
@@ -54,7 +58,6 @@
         border-radius: 50%;
         cursor: pointer;
         font-weight: bold;
-        transition: all 0.3s;
       }
 
       .qno.active {
@@ -63,7 +66,7 @@
       }
 
       .qno.answered {
-        background: #facc15; /* yellow for answered */
+        background: #facc15;
         color: #000;
       }
 
@@ -79,7 +82,6 @@
         border-radius: 8px;
         margin: 10px 0;
         cursor: pointer;
-        transition: background 0.2s;
       }
 
       .option:hover {
@@ -103,7 +105,6 @@
         border-radius: 6px;
         font-size: 16px;
         cursor: pointer;
-        transition: background 0.2s;
       }
 
       button:hover {
@@ -118,20 +119,21 @@
           width: 100%;
           display: flex;
           flex-wrap: wrap;
-          border-right: none;
-          border-bottom: 2px solid #334155;
         }
       }
     </style>
   </head>
+
   <body>
     <header>RRB GROUP D CBT</header>
     <div id="timer">90:00</div>
 
     <div class="main">
       <div class="left" id="palette"></div>
+
       <div class="right">
         <div id="questionBox"></div>
+
         <div class="buttons">
           <button onclick="prevQ()">Previous</button>
           <button onclick="nextQ()">Next</button>
@@ -144,16 +146,16 @@
       const roll = localStorage.getItem("roll");
       if (!roll) location.href = "login.html";
 
-      let time = 90 * 60,
-        questions = [],
-        answers = {},
-        current = 0;
+      let time = 90 * 60;
+      let questions = [];
+      let answers = {};
+      let current = 0;
 
       /* TIMER */
-      setInterval(() => {
+      const timer = setInterval(() => {
         time--;
-        let m = Math.floor(time / 60),
-          s = time % 60;
+        let m = Math.floor(time / 60);
+        let s = time % 60;
         document.getElementById("timer").innerText =
           `${m}:${s.toString().padStart(2, "0")}`;
         if (time <= 0) submitExam();
@@ -164,12 +166,14 @@
         .then((r) => r.json())
         .then((d) => {
           const pick = (a, n) => a.sort(() => 0.5 - Math.random()).slice(0, n);
+
           questions = [
             ...pick(d.maths, 25),
             ...pick(d.reasoning, 30),
             ...pick(d.science, 25),
             ...pick(d.ga, 20),
           ];
+
           buildPalette();
           showQ(0);
         });
@@ -178,6 +182,7 @@
       function buildPalette() {
         const palette = document.getElementById("palette");
         palette.innerHTML = "";
+
         questions.forEach((_, i) => {
           const div = document.createElement("div");
           div.className = "qno";
@@ -191,14 +196,16 @@
       /* SHOW QUESTION */
       function showQ(i) {
         current = i;
+
         document
           .querySelectorAll(".qno")
           .forEach((x) => x.classList.remove("active"));
-        const qDiv = document.getElementById("q" + i);
-        qDiv.classList.add("active");
+
+        document.getElementById("q" + i).classList.add("active");
 
         const q = questions[i];
         const box = document.getElementById("questionBox");
+
         box.innerHTML =
           `<h3>Q${i + 1}. ${q.question}</h3>` +
           q.options
@@ -206,7 +213,8 @@
               (op, idx) => `
           <div class="option" onclick="selectAnswer(${i}, ${idx})">
             <label>
-              <input type="radio" name="opt" ${answers[i] == idx ? "checked" : ""}>
+              <input type="radio" name="opt"
+                ${answers[i] === idx ? "checked" : ""}>
               ${op}
             </label>
           </div>`,
@@ -214,34 +222,87 @@
             .join("");
       }
 
-      /* ANSWER SELECT */
-      function selectAnswer(qIndex, optIndex) {
-        answers[qIndex] = optIndex;
-        // mark palette as answered
-        const qDiv = document.getElementById("q" + qIndex);
-        qDiv.classList.add("answered");
+      /* SELECT ANSWER */
+      function selectAnswer(qi, oi) {
+        answers[qi] = oi;
+        document.getElementById("q" + qi).classList.add("answered");
+        showQ(qi);
       }
 
-      /* NEXT/PREVIOUS */
       function nextQ() {
         if (current < questions.length - 1) showQ(current + 1);
       }
+
       function prevQ() {
         if (current > 0) showQ(current - 1);
       }
 
-      /* SUBMIT */
+      /* SUBMIT + PDF */
       function submitExam() {
+        clearInterval(timer);
+
         let c = 0,
           w = 0;
+
         questions.forEach((q, i) => {
           if (answers[i] == undefined) return;
           answers[i] == q.answer ? c++ : w++;
         });
-        let score = c - w * 0.33;
+
+        let score = (c - w * 0.33).toFixed(2);
 
         localStorage.setItem("attempt_" + roll, "yes");
         localStorage.setItem("result_" + roll, JSON.stringify({ c, w, score }));
+
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+
+        let y = 10;
+        doc.setFontSize(14);
+        doc.text("RRB GROUP D CBT – Answer Sheet", 10, y);
+        y += 10;
+
+        doc.setFontSize(11);
+        doc.text(`Roll Number: ${roll}`, 10, y);
+        y += 6;
+        doc.text(`Correct: ${c} | Wrong: ${w} | Score: ${score}`, 10, y);
+        y += 10;
+
+        questions.forEach((q, i) => {
+          if (y > 270) {
+            doc.addPage();
+            y = 10;
+          }
+
+          doc.setFont(undefined, "bold");
+          doc.text(`Q${i + 1}. ${q.question}`, 10, y);
+          y += 6;
+
+          doc.setFont(undefined, "normal");
+
+          q.options.forEach((op, idx) => {
+            let mark = "";
+            if (answers[i] === idx && idx === q.answer) mark = " ✓";
+            else if (answers[i] === idx && idx !== q.answer) mark = " ✗";
+
+            doc.text(`(${String.fromCharCode(65 + idx)}) ${op}${mark}`, 12, y);
+            y += 5;
+          });
+
+          doc.text(
+            `Your Answer: ${
+              answers[i] == undefined ? "Not Answered" : q.options[answers[i]]
+            }`,
+            12,
+            y,
+          );
+          y += 5;
+
+          doc.text(`Correct Answer: ${q.options[q.answer]}`, 12, y);
+          y += 8;
+        });
+
+        doc.save(`RRB_Group_D_Result_${roll}.pdf`);
         location.href = "result.html";
       }
     </script>
